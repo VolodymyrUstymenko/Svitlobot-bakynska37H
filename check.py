@@ -1,19 +1,23 @@
-import requests
 import os
+import requests
 import time
 import hmac
 import hashlib
+import json
 
-# Tuya
+# ========== CONFIG ==========
 ACCESS_ID = os.environ["ACCESS_ID"]
 ACCESS_SECRET = os.environ["ACCESS_SECRET"]
 DEVICE_ID = os.environ["DEVICE_ID"]
 REGION = os.environ.get("REGION", "eu")
-STATE_FILE = "state.txt"
 
-# Telegram
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+
+STATE_FILE = "state.txt"
 USERS_FILE = "users.txt"
+
+GETUPDATES_FILE = "last_update_id.txt"  # для зберігання останнього update_id
+# ============================
 
 def tuya_headers():
     t = str(int(time.time() * 1000))
@@ -40,11 +44,49 @@ def save_state(state):
     with open(STATE_FILE, "w") as f:
         f.write(state)
 
+def get_last_update_id():
+    if not os.path.exists(GETUPDATES_FILE):
+        return None
+    with open(GETUPDATES_FILE, "r") as f:
+        return f.read().strip()
+
+def save_last_update_id(update_id):
+    with open(GETUPDATES_FILE, "w") as f:
+        f.write(str(update_id))
+
 def get_chat_ids():
-    if not os.path.exists(USERS_FILE):
-        return []
-    with open(USERS_FILE, "r") as f:
-        return [line.strip() for line in f if line.strip()]
+    chat_ids = set()
+    # зберігаємо всіх користувачів у файлі
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r") as f:
+            chat_ids.update(f.read().splitlines())
+    return chat_ids
+
+def add_chat_id(chat_id):
+    chat_ids = get_chat_ids()
+    chat_ids.add(str(chat_id))
+    with open(USERS_FILE, "w") as f:
+        f.write("\n".join(chat_ids))
+
+def poll_updates():
+    last_update_id = get_last_update_id()
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?timeout=5"
+    if last_update_id:
+        url += f"&offset={int(last_update_id)+1}"
+
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    updates = data.get("result", [])
+    for upd in updates:
+        update_id = upd["update_id"]
+        message = upd.get("message")
+        if message and "text" in message:
+            text = message["text"]
+            chat_id = message["chat"]["id"]
+            if text.strip() == "/start":
+                add_chat_id(chat_id)
+        save_last_update_id(update_id)
 
 def send_telegram(msg):
     chat_ids = get_chat_ids()
@@ -56,9 +98,14 @@ def send_telegram(msg):
         )
 
 def main():
+    # спочатку обробляємо нових користувачів
+    poll_updates()
+
+    # перевірка стану Tuya
     online = get_device_online()
     current = "online" if online else "offline"
     prev = load_prev_state()
+
     if prev != current:
         emoji = "✅" if online else "❌"
         send_telegram(f"Tuya розетка: {current.upper()} {emoji}")
