@@ -31,6 +31,8 @@ def tuya_headers():
 def get_device_online():
     url = f"https://openapi.tuya{REGION}.com/v1.0/devices/{DEVICE_ID}"
     r = requests.get(url, headers=tuya_headers(), timeout=10)
+    print("Status code:", r.status_code)
+    print("Response:", r.text)
     r.raise_for_status()
     return r.json()["result"]["online"]
 
