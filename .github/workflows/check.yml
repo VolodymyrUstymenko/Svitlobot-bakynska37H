@@ -1,0 +1,31 @@
+name: Tuya socket monitor
+
+on:
+  schedule:
+    - cron: "*/1 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run monitor
+        env:
+          ACCESS_ID: ${{ secrets.ACCESS_ID }}
+          ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
+          DEVICE_ID: ${{ secrets.DEVICE_ID }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          REGION: eu
+        run: python check.py
