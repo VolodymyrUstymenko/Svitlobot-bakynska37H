@@ -1,4 +1,4 @@
-name: Tuya socket monitor
+name: Tuya multi-user monitor
 
 on:
   schedule:
@@ -8,16 +8,16 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Restore previous state
+      - name: Restore state and users
         uses: actions/cache@v4
         with:
-          path: state.txt
-          key: tuya-socket-state
+          path: |
+            state.txt
+            users.txt
+          key: tuya-multi-state
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,12 +33,13 @@ jobs:
           ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
           DEVICE_ID: ${{ secrets.DEVICE_ID }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
           REGION: eu
         run: python check.py
 
-      - name: Save current state
+      - name: Save state and users
         uses: actions/cache@v4
         with:
-          path: state.txt
-          key: tuya-socket-state
+          path: |
+            state.txt
+            users.txt
+          key: tuya-multi-state
