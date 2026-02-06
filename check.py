@@ -1,20 +1,19 @@
 import requests
-import json
 import os
 import time
 import hmac
 import hashlib
 
 # ====== CONFIG ======
-ACCESS_ID = "TUYA_ACCESS_ID"
-ACCESS_SECRET = "TUYA_ACCESS_SECRET"
-DEVICE_ID = "TUYA_DEVICE_ID"
-REGION = "eu"  # eu / us / cn
+ACCESS_ID = os.environ["ACCESS_ID"]
+ACCESS_SECRET = os.environ["ACCESS_SECRET"]
+DEVICE_ID = os.environ["DEVICE_ID"]
+REGION = os.environ.get("REGION", "eu")
 
-BOT_TOKEN = "TELEGRAM_BOT_TOKEN"
-CHAT_ID = "TELEGRAM_CHAT_ID"
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID = os.environ["CHAT_ID"]
 
-STATE_FILE = "/tmp/tuya_socket_state.txt"
+STATE_FILE = "state.txt"
 # ====================
 
 
@@ -52,7 +51,7 @@ def send_telegram(msg):
 def load_prev_state():
     if not os.path.exists(STATE_FILE):
         return None
-    with open(STATE_FILE) as f:
+    with open(STATE_FILE, "r") as f:
         return f.read().strip()
 
 
