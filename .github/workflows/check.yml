@@ -8,9 +8,16 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Restore previous state
+        uses: actions/cache@v4
+        with:
+          path: state.txt
+          key: tuya-socket-state
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,3 +36,9 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           REGION: eu
         run: python check.py
+
+      - name: Save current state
+        uses: actions/cache@v4
+        with:
+          path: state.txt
+          key: tuya-socket-state
