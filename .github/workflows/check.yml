@@ -8,8 +8,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Restore state and users
         uses: actions/cache@v4
@@ -17,6 +19,7 @@ jobs:
           path: |
             state.txt
             users.txt
+            last_update_id.txt
           key: tuya-multi-state
 
       - name: Set up Python
@@ -27,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run monitor
+      - name: Run Tuya monitor
         env:
           ACCESS_ID: ${{ secrets.ACCESS_ID }}
           ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
@@ -42,4 +45,5 @@ jobs:
           path: |
             state.txt
             users.txt
+            last_update_id.txt
           key: tuya-multi-state
