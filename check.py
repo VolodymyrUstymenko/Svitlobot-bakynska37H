@@ -10,31 +10,54 @@ ACCESS_ID = os.environ["ACCESS_ID"]
 ACCESS_SECRET = os.environ["ACCESS_SECRET"]
 DEVICE_ID = os.environ["DEVICE_ID"]
 REGION = os.environ.get("REGION", "eu")
-
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 STATE_FILE = "state.txt"
 USERS_FILE = "users.txt"
-
 GETUPDATES_FILE = "last_update_id.txt"  # для зберігання останнього update_id
 # ============================
 
-def tuya_headers():
+def get_access_token():
     t = str(int(time.time() * 1000))
     sign = hmac.new(
-        ACCESS_SECRET.encode(),
-        (ACCESS_ID + t).encode(),
+        ACCESS_SECRET.encode("utf-8"),
+        (ACCESS_ID + t).encode("utf-8"),
         hashlib.sha256
     ).hexdigest().upper()
-    return {"client_id": ACCESS_ID, "sign": sign, "t": t, "sign_method": "HMAC-SHA256"}
+    headers = {
+        "client_id": ACCESS_ID,
+        "sign": sign,
+        "t": t,
+        "sign_method": "HMAC-SHA256"
+    }
+    url = f"https://openapi.tuya{REGION}.com/v1.0/token?grant_type=1"
+    r = requests.get(url, headers=headers, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    if not data.get("success"): raise Exception(f"Token error: {data}")
+    return data["result"]["access_token"]
 
 def get_device_online():
+    access_token = get_access_token()
+    t = str(int(time.time() * 1000))
+    sign = hmac.new(
+        ACCESS_SECRET.encode("utf-8"),
+        (ACCESS_ID + access_token + t).encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest().upper()
+    headers = {
+        "client_id": ACCESS_ID,
+        "access_token": access_token,
+        "sign": sign,
+        "t": t,
+        "sign_method": "HMAC-SHA256"
+    }
     url = f"https://openapi.tuya{REGION}.com/v1.0/devices/{DEVICE_ID}"
-    r = requests.get(url, headers=tuya_headers(), timeout=10)
-    print("Status code:", r.status_code)
-    print("Response:", r.text)
+    r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
-    return r.json()["result"]["online"]
+    data = r.json()
+    if not data.get("success"): raise Exception(f"Device error: {data}")
+    return data["result"]["online"]
 
 def load_prev_state():
     if not os.path.exists(STATE_FILE):
