@@ -82,10 +82,8 @@ def get_device_online():
     print(data)
     if not data.get("success"):
         raise Exception(f"Device status error: {data}")
-    # status — це список
     for item in data["result"]:
-        if item["code"] == "online":
-            return item["value"]
+        return item["online"]
     raise Exception("Online status not found in response")
 
 def load_prev_state():
