@@ -92,6 +92,10 @@ def send_telegram(msg):
 # ===== FLASK APP =====
 app = Flask(__name__)
 
+@app.route("/health", methods=["GET"])
+def health():
+    return "ok", 200
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
