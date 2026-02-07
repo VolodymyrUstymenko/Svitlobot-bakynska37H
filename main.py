@@ -3,18 +3,16 @@ import requests
 import time
 import hmac
 import hashlib
-import json
+from flask import Flask, request
 
-# ========== CONFIG ==========
+# ===== CONFIG =====
 ACCESS_ID = os.environ["ACCESS_ID"]
 ACCESS_SECRET = os.environ["ACCESS_SECRET"]
 DEVICE_ID = os.environ["DEVICE_ID"]
 REGION = os.environ.get("REGION", "eu")
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-STATE_FILE = "state.txt"
-USERS_FILE = "users.txt"
-GETUPDATES_FILE = "last_update_id.txt"  # для зберігання останнього update_id
+CHAT_IDS = set()
 # ============================
 def sha256_hex(data: str) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
@@ -83,79 +81,36 @@ def get_device_online():
         raise Exception(f"Device error: {data}")
     return data["result"]["online"]
 
-def load_prev_state():
-    if not os.path.exists(STATE_FILE):
-        return None
-    with open(STATE_FILE, "r") as f:
-        return f.read().strip()
-
-def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        f.write(state)
-
-def get_last_update_id():
-    if not os.path.exists(GETUPDATES_FILE):
-        return None
-    with open(GETUPDATES_FILE, "r") as f:
-        return f.read().strip()
-
-def save_last_update_id(update_id):
-    with open(GETUPDATES_FILE, "w") as f:
-        f.write(str(update_id))
-
-def get_chat_ids():
-    chat_ids = set()
-    # зберігаємо всіх користувачів у файлі
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            chat_ids.update(f.read().splitlines())
-    return chat_ids
-
-def add_chat_id(chat_id):
-    chat_ids = get_chat_ids()
-    chat_ids.add(str(chat_id))
-    with open(USERS_FILE, "w") as f:
-        f.write("\n".join(chat_ids))
-
-def poll_updates():
-    last_update_id = get_last_update_id()
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?timeout=5"
-    if last_update_id:
-        url += f"&offset={int(last_update_id)+1}"
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    data = r.json()
-    updates = data.get("result", [])
-    for upd in updates:
-        update_id = upd["update_id"]
-        message = upd.get("message")
-        if message and "text" in message:
-            text = message["text"]
-            chat_id = message["chat"]["id"]
-            if text.strip() == "/start":
-                add_chat_id(chat_id)
-        save_last_update_id(update_id)
-
 def send_telegram(msg):
-    chat_ids = get_chat_ids()
-    for chat_id in chat_ids:
+    for chat_id in CHAT_IDS:
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": chat_id, "text": msg},
             timeout=10
         )
 
-def main():
-    # спочатку обробляємо нових користувачів
-    poll_updates()
-    # перевірка стану Tuya
+# ===== FLASK APP =====
+app = Flask(__name__)
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.get_json()
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "").strip()
+        if text == "/start":
+            CHAT_IDS.add(chat_id)
+            requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                          data={"chat_id": chat_id, "text": "Вас додано до сповіщень!"})
+    return "OK", 200
+
+@app.route("/check", methods=["GET"])
+def check_status():
     online = get_device_online()
-    current = "online" if online else "offline"
-    prev = load_prev_state()
-    if prev != current:
-        emoji = "✅" if online else "❌"
-        send_telegram(f"Tuya розетка: {current.upper()} {emoji}")
-        save_state(current)
+    status = "online ✅" if online else "offline ❌"
+    send_telegram(f"Tuya розетка: {status}")
+    return {"status": status}, 200
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+        save_state(current)
