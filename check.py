@@ -56,7 +56,7 @@ def get_access_token():
 def get_device_online():
     access_token = get_access_token()
     method = "GET"
-    path = f"/v1.0/iot-03/devices/{DEVICE_ID}/status"
+    path = f"/v1.0/iot-03/devices/{DEVICE_ID}"
     body = ""
     t = str(int(time.time() * 1000))
     string_to_sign = (
