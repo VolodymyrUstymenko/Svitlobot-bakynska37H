@@ -79,6 +79,7 @@ def get_device_online():
     r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
     data = r.json()
+    print(data)
     if not data.get("success"):
         raise Exception(f"Device status error: {data}")
     # status — це список
