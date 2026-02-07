@@ -79,12 +79,9 @@ def get_device_online():
     r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
     data = r.json()
-    print(data)
     if not data.get("success"):
-        raise Exception(f"Device status error: {data}")
-    for item in data["result"]:
-        return item["online"]
-    raise Exception("Online status not found in response")
+        raise Exception(f"Device error: {data}")
+    return data["result"]["online"]
 
 def load_prev_state():
     if not os.path.exists(STATE_FILE):
