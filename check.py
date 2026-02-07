@@ -16,35 +16,58 @@ STATE_FILE = "state.txt"
 USERS_FILE = "users.txt"
 GETUPDATES_FILE = "last_update_id.txt"  # для зберігання останнього update_id
 # ============================
+def sha256_hex(data: str) -> str:
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
-def get_access_token():
-    t = str(int(time.time() * 1000))
-    sign = hmac.new(
-        ACCESS_SECRET.encode("utf-8"),
-        (ACCESS_ID + t).encode("utf-8"),
+def hmac_sha256_upper(key: str, msg: str) -> str:
+    return hmac.new(
+        key.encode("utf-8"),
+        msg.encode("utf-8"),
         hashlib.sha256
     ).hexdigest().upper()
+
+def get_access_token():
+    method = "GET"
+    path = "/v1.0/token?grant_type=1"
+    body = ""  # GET → empty body
+    t = str(int(time.time() * 1000))
+    string_to_sign = (
+        ACCESS_ID +
+        t +
+        method + "\n" +
+        sha256_hex(body) + "\n\n" +
+        path
+    )
+    sign = hmac_sha256_upper(ACCESS_SECRET, string_to_sign)
     headers = {
         "client_id": ACCESS_ID,
         "sign": sign,
         "t": t,
         "sign_method": "HMAC-SHA256"
     }
-    url = f"https://openapi.tuya{REGION}.com/v1.0/token?grant_type=1"
+    url = f"https://openapi.tuya{REGION}.com{path}"
     r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
     data = r.json()
-    if not data.get("success"): raise Exception(f"Token error: {data}")
+    if not data.get("success"):
+        raise Exception(f"Token error: {data}")
     return data["result"]["access_token"]
 
 def get_device_online():
     access_token = get_access_token()
+    method = "GET"
+    path = f"/v1.0/iot-03/devices/{DEVICE_ID}/status"
+    body = ""
     t = str(int(time.time() * 1000))
-    sign = hmac.new(
-        ACCESS_SECRET.encode("utf-8"),
-        (ACCESS_ID + access_token + t).encode("utf-8"),
-        hashlib.sha256
-    ).hexdigest().upper()
+    string_to_sign = (
+        ACCESS_ID +
+        access_token +
+        t +
+        method + "\n" +
+        sha256_hex(body) + "\n\n" +
+        path
+    )
+    sign = hmac_sha256_upper(ACCESS_SECRET, string_to_sign)
     headers = {
         "client_id": ACCESS_ID,
         "access_token": access_token,
@@ -52,12 +75,17 @@ def get_device_online():
         "t": t,
         "sign_method": "HMAC-SHA256"
     }
-    url = f"https://openapi.tuya{REGION}.com/v1.0/devices/{DEVICE_ID}"
+    url = f"https://openapi.tuya{REGION}.com{path}"
     r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
     data = r.json()
-    if not data.get("success"): raise Exception(f"Device error: {data}")
-    return data["result"]["online"]
+    if not data.get("success"):
+        raise Exception(f"Device status error: {data}")
+    # status — це список
+    for item in data["result"]:
+        if item["code"] == "online":
+            return item["value"]
+    raise Exception("Online status not found in response")
 
 def load_prev_state():
     if not os.path.exists(STATE_FILE):
@@ -98,7 +126,6 @@ def poll_updates():
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?timeout=5"
     if last_update_id:
         url += f"&offset={int(last_update_id)+1}"
-
     r = requests.get(url, timeout=10)
     r.raise_for_status()
     data = r.json()
@@ -125,12 +152,10 @@ def send_telegram(msg):
 def main():
     # спочатку обробляємо нових користувачів
     poll_updates()
-
     # перевірка стану Tuya
     online = get_device_online()
     current = "online" if online else "offline"
     prev = load_prev_state()
-
     if prev != current:
         emoji = "✅" if online else "❌"
         send_telegram(f"Tuya розетка: {current.upper()} {emoji}")
