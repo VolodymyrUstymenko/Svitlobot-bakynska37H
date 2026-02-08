@@ -12,8 +12,8 @@ DEVICE_ID = os.environ["DEVICE_ID"]
 REGION = os.environ.get("REGION", "eu")
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-STATE_FILE = "state.txt"
-CHAT_IDS = "chat_ids.txt"
+GIST_ID = os.environ["GIST_ID"]
+GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 # ============================
 def sha256_hex(data: str) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
@@ -83,70 +83,67 @@ def get_device_online():
     return data["result"]["online"]
 
 def load_state():
-    if not os.path.exists(STATE_FILE):
-        return None
-    with open(STATE_FILE) as f:
-        return f.read().strip()
+    url = f"https://api.github.com/gists/{GIST_ID}"
+    r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    r.raise_for_status()
+    data = r.json()
+    content = data["files"]["bot_state.json"]["content"]
+    return json.loads(content)
 
-def save_state(state: str):
-    with open(STATE_FILE, "w") as f:
-        f.write(state)
-
-def load_chat_ids():
-    if not os.path.exists(CHAT_IDS):
-        return set()
-    with open(CHAT_IDS) as f:
-        return set(line.strip() for line in f if line.strip())
-
-def save_chat_ids(chat_ids: set):
-    with open(CHAT_IDS, "w") as f:
-        f.write("\n".join(str(cid) for cid in chat_ids))
+def save_state(state_dict):
+    url = f"https://api.github.com/gists/{GIST_ID}"
+    payload = {
+        "files": {
+            "bot_state.json": {
+                "content": json.dumps(state_dict, indent=2)
+            }
+        }
+    }
+    r = requests.patch(url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    r.raise_for_status()
         
-def send_telegram(msg):
-    chat_ids = load_chat_ids()
+def send_telegram(msg, chat_ids):
     for chat_id in chat_ids:
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": chat_id, "text": msg},
             timeout=10
         )
+        print(f"Надіслано до {chat_id}: {r.status_code}, {r.text}")
 
 # ===== FLASK APP =====
 app = Flask(__name__)
 
-@app.route("/health", methods=["GET"])
-def health():
-    return "ok", 200
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.get_json(force=True, silent=True) or {}
-    msg = data.get("message")
-    if not msg: return "ok", 200
-    text = msg.get("text", "").strip()
-    chat_id = msg["chat"]["id"]
-    if text == "/start":
-        chat_ids = load_chat_ids()
-        if str(chat_id) not in chat_ids:
-            chat_ids.add(str(chat_id))
-            save_chat_ids(chat_ids)
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": chat_id, "text": "Вас додано до сповіщень!"}
-        )
-    return "ok", 200
+    state = load_state()
+    chat_ids = set(state.get("chat_ids", []))
+    data = request.get_json()
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "").strip()
+        if text == "/start":
+            if chat_id not in chat_ids:
+                chat_ids.add(chat_id)
+                state["chat_ids"] = list(chat_ids)
+                save_state(state)
+            requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                          data={"chat_id": chat_id, "text": "Вас додано до сповіщень!"})
+    return "OK", 200
 
 @app.route("/check", methods=["GET"])
 def check_status():
+    state = load_state()
+    chat_ids = set(state.get("chat_ids", []))
+    last_state = state.get("last_state", None)
     online = get_device_online()
-    current = "є ✅" if online else "нема ❌"
-    prev = load_state()
-
-    if prev != current:
-        send_telegram(f"Світло {current}!")
-        save_state(current)
-
-    return {"status": current, "changed": prev != current}, 200
+    current_state = "online" if online else "offline"
+    if current_state != last_state:
+        msg = "Світло Є! ✅" if online else "Світла нема ❌"
+        send_telegram(msg, chat_ids)
+        state["last_state"] = current_state
+        save_state(state)
+    return {"status": current_state}, 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
