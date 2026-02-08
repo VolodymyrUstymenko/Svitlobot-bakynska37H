@@ -104,7 +104,7 @@ def save_state(state_dict):
         
 def send_telegram(msg, chat_ids):
     for chat_id in chat_ids:
-        requests.post(
+        r = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": chat_id, "text": msg},
             timeout=10
