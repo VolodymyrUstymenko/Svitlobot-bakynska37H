@@ -11,7 +11,7 @@ ACCESS_SECRET = os.environ["ACCESS_SECRET"]
 DEVICE_ID = os.environ["DEVICE_ID"]
 REGION = os.environ.get("REGION", "eu")
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-
+CHANNEL_ID = os.environ["CHANNEL_ID"]
 GIST_ID = os.environ["GIST_ID"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 # ============================
@@ -102,45 +102,26 @@ def save_state(state_dict):
     r = requests.patch(url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
     r.raise_for_status()
         
-def send_telegram(msg, chat_ids):
-    for chat_id in chat_ids:
-        r = requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": chat_id, "text": msg},
-            timeout=10
-        )
-        print(f"Надіслано до {chat_id}: {r.status_code}, {r.text}")
+def send_telegram(msg):
+    r = requests.post(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        data={"chat_id": CHANNEL_ID, "text": msg},
+        timeout=10
+    )
+    print(r.status_code, r.text)
 
 # ===== FLASK APP =====
 app = Flask(__name__)
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    state = load_state()
-    chat_ids = set(state.get("chat_ids", []))
-    data = request.get_json()
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "").strip()
-        if text == "/start":
-            if chat_id not in chat_ids:
-                chat_ids.add(chat_id)
-                state["chat_ids"] = list(chat_ids)
-                save_state(state)
-            requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                          data={"chat_id": chat_id, "text": "Вас додано до сповіщень!"})
-    return "OK", 200
-
 @app.route("/check", methods=["GET"])
 def check_status():
     state = load_state()
-    chat_ids = set(state.get("chat_ids", []))
     last_state = state.get("last_state", None)
     online = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
         msg = "Світло Є! ✅" if online else "Світла нема ❌"
-        send_telegram(msg, chat_ids)
+        send_telegram(msg)
         state["last_state"] = current_state
         save_state(state)
     return {"status": current_state}, 200
