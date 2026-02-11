@@ -78,6 +78,7 @@ def get_device_online():
     r = requests.get(url, headers=headers, timeout=10)
     r.raise_for_status()
     data = r.json()
+    print(data)
     if not data.get("success"):
         raise Exception(f"Device error: {data}")
     return data["result"]["online"]
@@ -117,10 +118,11 @@ app = Flask(__name__)
 def check_status():
     state = load_state()
     last_state = state.get("last_state", None)
+    time = state.get("time", None)
     online = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
-        msg = "Світло Є! ✅" if online else "Світла нема ❌"
+        msg = "Світло З'ЯВИЛОСЯ ✅" if online else "Світла ЗНИКЛО ❌"
         send_telegram(msg)
         state["last_state"] = current_state
         save_state(state)
