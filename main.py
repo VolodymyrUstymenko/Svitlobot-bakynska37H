@@ -123,7 +123,7 @@ def check_status():
     current_state = "online" if online else "offline"
     if current_state != last_state:
         dt = datetime.fromtimestamp(t / 1000)
-        msg = f"✅ {dt.hours}:{dt.minutes} Світло з'явилося" if online else f"❌ {dt.hours}:{dt.minutes} Світло зникло"
+        msg = f"✅ {dt.hour}:{dt.minute} Світло з'явилося" if online else f"❌ {dt.hour}:{dt.minute} Світло зникло"
         word = '⏱ Його не було ' if online else '⏱ Воно було '
         
         duration_seconds = abs(t - time) / 1000
