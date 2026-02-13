@@ -122,7 +122,7 @@ def check_status():
     (online, t) = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
-        dt = datetime.fromtimestamp(t / 1000)
+        dt = datetime.fromtimestamp(t // 1000)
         msg = f"✅ {dt.hour}:{dt.minute} Світло з'явилося" if online else f"❌ {dt.hour}:{dt.minute} Світло зникло"
         word = '⏱ Його не було ' if online else '⏱ Воно було '
         
