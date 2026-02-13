@@ -5,6 +5,7 @@ import hmac
 import hashlib
 from flask import Flask, request
 import json
+from datetime import datetime
 # ===== CONFIG =====
 ACCESS_ID = os.environ["ACCESS_ID"]
 ACCESS_SECRET = os.environ["ACCESS_SECRET"]
@@ -121,7 +122,8 @@ def check_status():
     (online, t) = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
-        msg = "✅ Світло з'явилося" if online else "❌ Світло зникло"
+        dt = datetime.fromtimestamp(t / 1000)
+        msg = f"✅ {dt.hours}:{dt.minutes} Світло з'явилося" if online else f"❌ {dt.hours}:{dt.minutes} Світло зникло"
         word = '⏱ Його не було ' if online else '⏱ Воно було '
         
         duration_seconds = abs(t - time) / 1000
