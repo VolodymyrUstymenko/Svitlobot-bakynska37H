@@ -121,10 +121,13 @@ def check_status():
     (online, t) = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
-        word = '⏱ Відключення тривало' if online else '⏱ Світло було впродовж'
-        msg = "Світло З'ЯВИЛОСЯ ✅" if online else "Світла ЗНИКЛО ❌"
-        duration_hours = (time - t) // 3600000
-        duration_minutes = ((time - t) % 3600000) // 60000
+        msg = "✅ Світло з'явилося" if online else "❌ Світло зникло"
+        word = '⏱ Його не було ' if online else '⏱ Воно було '
+        
+        duration_seconds = abs(t - time) / 1000
+        duration_hours = duration_seconds // 3600
+        duration_minutes = (duration_seconds % 3600) // 60
+        
         text = msg + '\n' + word + f"{duration_hours} год {duration_minutes} хв"
         send_telegram(text)
         state["last_state"] = current_state
