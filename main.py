@@ -5,7 +5,8 @@ import hmac
 import hashlib
 from flask import Flask, request
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 # ===== CONFIG =====
 ACCESS_ID = os.environ["ACCESS_ID"]
 ACCESS_SECRET = os.environ["ACCESS_SECRET"]
@@ -122,15 +123,22 @@ def check_status():
     (online, t) = get_device_online()
     current_state = "online" if online else "offline"
     if current_state != last_state:
-        dt = datetime.fromtimestamp(t // 1000)
-        msg = f"✅ {dt.hour}:{dt.minute} Світло з'явилося" if online else f"❌ {dt.hour}:{dt.minute} Світло зникло"
+        dt = datetime.fromtimestamp(t / 1000)
+        dtz = dt.astimezone(ZoneInfo("Europe/Kyiv"))
+        msg = f"✅ {dtz.hour}:{dtz.minute} Світло з'явилося" if online else f"❌ {dtz.hour}:{dtz.minute} Світло зникло"
         word = '⏱ Його не було ' if online else '⏱ Воно було '
         
-        duration_seconds = abs(t - time) / 1000
-        duration_hours = duration_seconds // 3600
-        duration_minutes = (duration_seconds % 3600) // 60
-        
-        text = msg + '\n' + word + f"{duration_hours} год {duration_minutes} хв"
+        delta = timedelta(milliseconds=abs(t - time))
+        days = delta.days
+        total_seconds = delta.seconds
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        parts = []
+        if days: parts.append(f"{days} дн")
+        if hours: parts.append(f"{hours} год")
+        if minutes or not parts: parts.append(f"{minutes} хв")
+        duration = " ".join(parts)
+        text = msg + '\n' + word + duration
         send_telegram(text)
         state["last_state"] = current_state
         state["time"] = t
